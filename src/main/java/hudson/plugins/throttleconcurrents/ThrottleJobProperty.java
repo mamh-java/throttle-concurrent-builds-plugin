@@ -6,6 +6,7 @@ import hudson.matrix.MatrixConfiguration;
 import hudson.matrix.MatrixProject;
 import hudson.matrix.MatrixRun;
 import hudson.model.AbstractDescribableImpl;
+import hudson.model.AbstractProject;
 import hudson.model.Descriptor;
 import hudson.model.Item;
 import hudson.model.ItemGroup;
@@ -45,6 +46,7 @@ import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -414,6 +416,21 @@ public class ThrottleJobProperty extends JobProperty<Job<?,?>> {
              
         public boolean isMatrixProject(Job job) {
             return job instanceof MatrixProject;
+        }
+
+
+        public boolean isParameterized(Job job) {
+            boolean result = false;
+
+
+            Jenkins jenkins = Jenkins.get();
+
+            if (job instanceof AbstractProject) {
+                result = ((AbstractProject) job).isParameterized();
+            } else if (jenkins.getPlugin("workflow-job") != null && job instanceof WorkflowJob) {
+                result = ((WorkflowJob) job).isParameterized();
+            }
+            return result;
         }
 
         @Override
