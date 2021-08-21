@@ -21,7 +21,30 @@ import hudson.model.queue.SubTask;
 import hudson.model.queue.WorkUnit;
 import hudson.plugins.throttleconcurrents.pipeline.ThrottleStep;
 import hudson.security.ACL;
+import jenkins.model.Jenkins;
+import jenkins.security.NonSerializableSecurityContext;
+import org.acegisecurity.context.SecurityContext;
+import org.acegisecurity.context.SecurityContextHolder;
+import org.jenkinsci.plugins.workflow.actions.BodyInvocationAction;
+import org.jenkinsci.plugins.workflow.cps.CpsStepContext;
+import org.jenkinsci.plugins.workflow.flow.FlowExecution;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionList;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
+import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
+import org.jenkinsci.plugins.workflow.graph.FlowNode;
+import org.jenkinsci.plugins.workflow.graph.StepNode;
+import org.jenkinsci.plugins.workflow.graphanalysis.LinearBlockHoppingScanner;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
+import org.jenkinsci.plugins.workflow.job.WorkflowRun;
+import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
+import org.jenkinsci.plugins.workflow.support.concurrent.Timeout;
+import org.jenkinsci.plugins.workflow.support.steps.ExecutorStepExecution;
+import org.jenkinsci.plugins.workflow.support.steps.ExecutorStepExecution.PlaceholderTask;
+
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,22 +52,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
-import jenkins.model.Jenkins;
-import jenkins.security.NonSerializableSecurityContext;
-import org.acegisecurity.context.SecurityContext;
-import org.acegisecurity.context.SecurityContextHolder;
-import org.jenkinsci.plugins.workflow.actions.BodyInvocationAction;
-import org.jenkinsci.plugins.workflow.flow.FlowExecution;
-import org.jenkinsci.plugins.workflow.flow.FlowExecutionList;
-import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
-import org.jenkinsci.plugins.workflow.graph.FlowNode;
-import org.jenkinsci.plugins.workflow.graph.StepNode;
-import org.jenkinsci.plugins.workflow.graphanalysis.LinearBlockHoppingScanner;
-import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
-import org.jenkinsci.plugins.workflow.support.concurrent.Timeout;
-import org.jenkinsci.plugins.workflow.support.steps.ExecutorStepExecution.PlaceholderTask;
 
 @Extension
 public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
@@ -96,7 +103,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
                     if (tjp.getMaxConcurrentPerNode().intValue() > 0) {
                         int maxConcurrentPerNode = tjp.getMaxConcurrentPerNode().intValue();
                         int runCount = buildsOfProjectOnNode(node, task);
-
+                        LOGGER.info("node: " + node + ", task: " + task + ", max: " + maxConcurrentPerNode + ", run: " + runCount);
                         // This would mean that there are as many or more builds currently running than are allowed.
                         if (runCount >= maxConcurrentPerNode) {
                             return CauseOfBlockage.fromMessage(Messages._ThrottleQueueTaskDispatcher_MaxCapacityOnNode(runCount));
@@ -465,11 +472,33 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             }
             ThrottleJobProperty tjp = p.getProperty(ThrottleJobProperty.class);
             return tjp;
+        } else if (task instanceof ExecutorStepExecution.PlaceholderTask) {
+            try {
+                WorkflowJob p = getWorkflowJob((PlaceholderTask) task);
+                ThrottleJobProperty tjp = p.getProperty(ThrottleJobProperty.class);
+                return tjp;
+            } catch (IllegalAccessException | NoSuchFieldException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
         return null;
     }
 
-    private int pipelinesOnNode(@Nonnull Node node, @Nonnull Run<?,?> run, @Nonnull List<FlowNode> flowNodes) {
+    private WorkflowJob getWorkflowJob(PlaceholderTask p) throws NoSuchFieldException, IllegalAccessException {
+        Field f = p.getClass().getDeclaredField("context");
+        f.setAccessible(true);
+        CpsStepContext context = (CpsStepContext) f.get(p);
+        f = context.getClass().getDeclaredField("executionRef");
+        f.setAccessible(true);
+        FlowExecutionOwner executionRef = (FlowExecutionOwner) f.get(context);
+        f = executionRef.getClass().getDeclaredField("run");
+        f.setAccessible(true);
+        WorkflowRun run = (WorkflowRun) f.get(executionRef);
+        return run.getParent();
+    }
+
+    private int pipelinesOnNode(@Nonnull Node node, @Nonnull Run<?, ?> run, @Nonnull List<FlowNode> flowNodes) {
         int runCount = 0;
         LOGGER.log(Level.FINE, "Checking for pipelines of {0} on node {1}", new Object[] {run.getDisplayName(), node.getDisplayName()});
 
@@ -549,8 +578,10 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         Computer computer = node.toComputer();
         if (computer != null) { //Not all nodes are certain to become computers, like nodes with 0 executors.
             // Count flyweight tasks that might not consume an actual executor.
-            for (Executor e : computer.getOneOffExecutors()) {
-                runCount += buildsOnExecutor(task, e);
+            if (task instanceof Job) {
+                for (Executor e : computer.getOneOffExecutors()) {
+                    runCount += buildsOnExecutor(task, e);
+                }
             }
 
             for (Executor e : computer.getExecutors()) {
@@ -577,6 +608,25 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         if (currentExecutable != null && task.equals(currentExecutable.getParent())) {
             runCount++;
         }
+
+        if (task instanceof ExecutorStepExecution.PlaceholderTask) {
+            try {
+                if (currentExecutable != null) {
+                    PlaceholderTask p1 = (PlaceholderTask) task;
+                    if (currentExecutable.getParent() instanceof ExecutorStepExecution.PlaceholderTask) {
+                        PlaceholderTask p2 = (PlaceholderTask) currentExecutable.getParent();
+                        WorkflowJob jobp = getWorkflowJob(p1);
+                        WorkflowJob jobp2 = getWorkflowJob(p2);
+                        if (jobp.equals(jobp2)) {
+                            runCount++;
+                        }
+                    }
+                }
+            } catch (IllegalAccessException | NullPointerException | NoSuchFieldException e) {
+
+            }
+        }
+
 
         return runCount;
     }
