@@ -605,6 +605,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
     private int buildsOnExecutor(Task task, Executor exec) {
         int runCount = 0;
         final Queue.Executable currentExecutable = exec.getCurrentExecutable();
+        final WorkUnit currentWorkUnit = exec.getCurrentWorkUnit();
         if (currentExecutable != null && task.equals(currentExecutable.getParent())) {
             runCount++;
         }
@@ -626,7 +627,19 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
 
             }
         }
+        if (task instanceof MatrixConfiguration) {
+            try {
+                if (currentWorkUnit != null && currentWorkUnit.work instanceof MatrixConfiguration) {
+                    MatrixProject parent1 = ((MatrixConfiguration) task).getParent();
+                    MatrixProject parent2 = ((MatrixConfiguration) currentWorkUnit.work).getParent();
+                    if (parent1.equals(parent2)) {
+                        runCount++;
+                    }
+                }
+            } catch (NullPointerException e) {
 
+            }
+        }
 
         return runCount;
     }
