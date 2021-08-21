@@ -26,13 +26,13 @@ THE SOFTWARE.
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>4.1</version>
+    <version>3.5</version>
     <relativePath />
   </parent>
 
   <artifactId>throttle-concurrents</artifactId>
   <packaging>hpi</packaging>
-  <name>Jenkins Throttle Concurrent Builds Plug-in</name>
+  <name>Throttle Concurrent Builds Plugin</name>
   <version>2.0.3-SNAPSHOT</version>
   <url>https://github.com/mamh-java/throttle-concurrent-builds-plugin</url>
   <description>Plugin to throttle the number of concurrent builds of a single job per node.</description>
@@ -47,6 +47,7 @@ THE SOFTWARE.
   <properties>
     <jenkins.version>2.222.3</jenkins.version>
     <java.level>8</java.level>
+    <slf4jVersion>1.7.26</slf4jVersion>
     <workflow-cps-plugin.version>2.70</workflow-cps-plugin.version>
     <workflow-support-plugin.version>3.3</workflow-support-plugin.version>
   </properties>
@@ -190,6 +191,12 @@ THE SOFTWARE.
             <groupId>org.jenkins-ci.plugins.workflow</groupId>
             <artifactId>workflow-support</artifactId>
             <version>${workflow-support-plugin.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jboss.marshalling</groupId>
+                    <artifactId>jboss-marshalling</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.jenkins-ci.plugins.workflow</groupId>
