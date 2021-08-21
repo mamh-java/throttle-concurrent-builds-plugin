@@ -33,7 +33,7 @@ THE SOFTWARE.
   <artifactId>throttle-concurrents</artifactId>
   <packaging>hpi</packaging>
   <name>Throttle Concurrent Builds Plugin</name>
-  <version>2.0.3-SNAPSHOT</version>
+  <version>2.0.3</version>
   <url>https://github.com/mamh-java/throttle-concurrent-builds-plugin</url>
   <description>Plugin to throttle the number of concurrent builds of a single job per node.</description>
 
