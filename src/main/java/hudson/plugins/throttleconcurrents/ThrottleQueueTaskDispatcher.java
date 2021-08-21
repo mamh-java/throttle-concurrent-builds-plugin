@@ -23,6 +23,7 @@ import hudson.plugins.throttleconcurrents.pipeline.ThrottleStep;
 import hudson.security.ACL;
 import hudson.security.ACLContext;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,13 +37,18 @@ import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.workflow.actions.BodyInvocationAction;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionList;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
 import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.graph.StepNode;
 import org.jenkinsci.plugins.workflow.graphanalysis.LinearBlockHoppingScanner;
 import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.support.concurrent.Timeout;
+import org.jenkinsci.plugins.workflow.support.steps.ExecutorStepExecution;
 import org.jenkinsci.plugins.workflow.support.steps.ExecutorStepExecution.PlaceholderTask;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
+import org.jenkinsci.plugins.workflow.job.WorkflowRun;
+import org.jenkinsci.plugins.workflow.cps.CpsStepContext;
 
 @Extension
 public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
@@ -88,7 +94,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
                     if (tjp.getMaxConcurrentPerNode().intValue() > 0) {
                         int maxConcurrentPerNode = tjp.getMaxConcurrentPerNode().intValue();
                         int runCount = buildsOfProjectOnNode(node, task);
-
+                        LOGGER.info("node: " + node + ", task: " + task + ", max: " + maxConcurrentPerNode + ", run: " + runCount);
                         // This would mean that there are as many or more builds currently running than are allowed.
                         if (runCount >= maxConcurrentPerNode) {
                             return CauseOfBlockage.fromMessage(Messages._ThrottleQueueTaskDispatcher_MaxCapacityOnNode(runCount));
@@ -459,7 +465,17 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             if (task instanceof MatrixConfiguration) {
                 p = ((MatrixConfiguration)task).getParent();
             }
-            return p.getProperty(ThrottleJobProperty.class);
+            ThrottleJobProperty tjp = p.getProperty(ThrottleJobProperty.class);
+            return tjp;
+        } else if (task instanceof ExecutorStepExecution.PlaceholderTask) {
+            try {
+                WorkflowJob p = getWorkflowJob((PlaceholderTask) task);
+                ThrottleJobProperty tjp = p.getProperty(ThrottleJobProperty.class);
+                return tjp;
+            } catch (IllegalAccessException | NoSuchFieldException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
         return null;
     }
@@ -680,6 +696,19 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             LOGGER.fine("node labels mismatch");
         }
         return maxConcurrentPerNodeLabeledIfMatch;
+    }
+
+    private WorkflowJob getWorkflowJob(PlaceholderTask p) throws NoSuchFieldException, IllegalAccessException {
+        Field f = p.getClass().getDeclaredField("context");
+        f.setAccessible(true);
+        CpsStepContext context = (CpsStepContext) f.get(p);
+        f = context.getClass().getDeclaredField("executionRef");
+        f.setAccessible(true);
+        FlowExecutionOwner executionRef = (FlowExecutionOwner) f.get(context);
+        f = executionRef.getClass().getDeclaredField("run");
+        f.setAccessible(true);
+        WorkflowRun run = (WorkflowRun) f.get(executionRef);
+        return run.getParent();
     }
 
     private static final Logger LOGGER = Logger.getLogger(ThrottleQueueTaskDispatcher.class.getName());
