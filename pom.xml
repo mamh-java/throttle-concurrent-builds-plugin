@@ -35,9 +35,9 @@ THE SOFTWARE.
   <packaging>hpi</packaging>
   <name>Jenkins Throttle Concurrent Builds Plug-in</name>
   <version>${revision}${changelist}</version>
-  <url>https://github.com/jenkinsci/throttle-concurrent-builds-plugin</url>
+  <url>https://github.com/mamh-java/throttle-concurrent-builds-plugin</url>
   <description>Plugin to throttle the number of concurrent builds of a single job per node.</description>
-  
+
   <licenses>
     <license>
       <name>MIT License</name>
@@ -45,13 +45,12 @@ THE SOFTWARE.
       <comments>All source code is under the MIT license.</comments>
     </license>
   </licenses>
-    
+
   <properties>
     <revision>2.5</revision>
     <changelist>-SNAPSHOT</changelist>
     <jenkins.version>2.222.4</jenkins.version>
     <java.level>8</java.level>
-    <gitHubRepo>jenkinsci/throttle-concurrent-builds-plugin</gitHubRepo>
   </properties>
 
   <developers>
@@ -90,10 +89,10 @@ THE SOFTWARE.
   </repositories>
 
   <scm>
-    <connection>scm:git:git://github.com/${gitHubRepo}.git</connection>
-    <developerConnection>scm:git:git@github.com:${gitHubRepo}.git</developerConnection>
-    <url>https://github.com/${gitHubRepo}</url>
-    <tag>${scmTag}</tag>
+    <connection>scm:git:git://github.com/mamh-java/throttle-concurrent-builds-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:mamh-java/throttle-concurrent-builds-plugin.git</developerConnection>
+    <url>https://github.com/mamh-java/throttle-concurrent-builds-plugin</url>
+    <tag>HEAD</tag>
   </scm>
 
 
