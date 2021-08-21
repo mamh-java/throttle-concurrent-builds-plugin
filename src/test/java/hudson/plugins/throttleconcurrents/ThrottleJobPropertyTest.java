@@ -308,7 +308,7 @@ public class ThrottleJobPropertyTest {
                     WebClientUtil.waitForJSExec(page.getWebClient());
                     HtmlForm config = page.getFormByName("config");
                     List<HtmlButton> deleteButtons =
-                            config.getByXPath(
+                            (List<HtmlButton>) config.getByXPath(
                                     "//td[@class='setting-name' and text()='Multi-Project Throttle Categories']/../td[@class='setting-main']//button[text()='Delete']");
                     assertEquals(1, deleteButtons.size());
                     deleteButtons.get(0).click();
