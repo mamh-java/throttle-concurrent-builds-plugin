@@ -89,7 +89,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         List<String> pipelineCategories = categoriesForPipeline(task);
 
         // Handle multi-configuration filters
-        if (!shouldBeThrottled(task, tjp) && pipelineCategories.isEmpty()) {
+        if (shouldNotThrottled(task, tjp) && pipelineCategories.isEmpty()) {
             return null;
         }
 
@@ -204,12 +204,12 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         return matrixOptions != null ? matrixOptions : ThrottleMatrixProjectOptions.DEFAULT;
     }
 
-    private boolean shouldBeThrottled(@Nonnull Task task, @CheckForNull ThrottleJobProperty tjp) {
+    private boolean shouldNotThrottled(@Nonnull Task task, @CheckForNull ThrottleJobProperty tjp) {
         if (tjp == null) {
-            return false;
+            return true;
         }
         if (!tjp.getThrottleEnabled()) {
-            return false;
+            return true;
         }
 
         // Handle matrix options
@@ -218,14 +218,14 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             matrixOptions = ThrottleMatrixProjectOptions.DEFAULT;
         }
         if (!matrixOptions.isThrottleMatrixConfigurations() && task instanceof MatrixConfiguration) {
-            return false;
+            return true;
         }
         if (!matrixOptions.isThrottleMatrixBuilds()&& task instanceof MatrixProject) {
-            return false;
+            return true;
         }
 
         // Allow throttling by default
-        return true;
+        return false;
     }
 
     public CauseOfBlockage canRun(Task task, ThrottleJobProperty tjp, List<String> pipelineCategories) {
@@ -248,7 +248,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
 
     private CauseOfBlockage canRunImpl(Task task, ThrottleJobProperty tjp, List<String> pipelineCategories) {
         final Jenkins jenkins = Jenkins.get();
-        if (!shouldBeThrottled(task, tjp) && pipelineCategories.isEmpty()) {
+        if (shouldNotThrottled(task, tjp) && pipelineCategories.isEmpty()) {
             return null;
         }
         if (jenkins.getQueue().isPending(task)) {
@@ -524,7 +524,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
     }
 
     private int buildsOfProjectOnNode(Node node, Task task) {
-        if (!shouldBeThrottled(task, getThrottleJobProperty(task))) {
+        if (shouldNotThrottled(task, getThrottleJobProperty(task))) {
             return 0;
         }
 
@@ -534,7 +534,7 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
     }
 
     private int buildsOfProjectOnAllNodes(Task task) {
-        if (!shouldBeThrottled(task, getThrottleJobProperty(task))) {
+        if (shouldNotThrottled(task, getThrottleJobProperty(task))) {
             return 0;
         }
 
