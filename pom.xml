@@ -49,29 +49,15 @@ THE SOFTWARE.
   <properties>
     <revision>2.5</revision>
     <changelist>-SNAPSHOT</changelist>
-    <jenkins.version>2.222.4</jenkins.version>
-    <java.level>8</java.level>
+      <jenkins.version>2.289.3</jenkins.version>
+      <java.level>8</java.level>
   </properties>
 
   <developers>
-    <developer>
-      <id>abayer</id>
-      <name>Andrew Bayer</name>
-      <email>andrew.bayer@gmail.com</email>
-      <timezone>-8</timezone>
-    </developer>
-    <developer>
-      <id>basil</id>
-      <name>Basil Crow</name>
-      <email>me@basilcrow.com</email>
-      <timezone>-8</timezone>
-    </developer>
-    <developer>
-      <id>oleg_nenashev</id>
-      <name>Oleg Nenashev</name>
-      <email>o.v.nenashev@gmail.com</email>
-      <timezone>+3</timezone>
-    </developer>
+      <developer>
+          <id>bright.ma</id>
+          <name>bright ma</name>
+      </developer>
   </developers>
   
   <contributors>
