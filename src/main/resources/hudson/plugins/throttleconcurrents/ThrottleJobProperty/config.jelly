@@ -23,7 +23,8 @@
     </f:entry>
 
     <j:if test="${descriptor.isParameterized(it)}">
-      <f:entry field="limitOneJobWithMatchingParams"  title="${%Prevent multiple jobs with identical parameters from running concurrently}">
+      <f:entry title="${%Prevent multiple jobs with identical parameters from running concurrently}"
+               field="limitOneJobWithMatchingParams">
         <f:checkbox />
       </f:entry>
       <f:entry title="${%List of parameters to check separated by commas or whitespaces}"
