@@ -342,13 +342,16 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
                 List<ParameterValue> executingUnitParams = getParametersFromWorkUnit(exec.getCurrentWorkUnit());
                 executingUnitParams = doFilterParams(paramsToCompare, executingUnitParams);
 
-                //与的意思，也就是需要关心的参数列表中所有的都要匹配上了才能返回true了
-                if(checkContainsAll(executingUnitParams, itemParams)){
-                    return true;
-                }
-                // 或的意思，也就是需要关心的参数列表中有任何一个匹配上了就返回true了
-                if(checkContainsAny(executingUnitParams, itemParams)){
-                    return true;
+                if(tjp.getParamsToUseForLimit().contains("&&")) {
+                    //与的意思，也就是需要关心的参数列表中所有的都要匹配上了才能返回true了
+                    if(checkContainsAll(executingUnitParams, itemParams)){
+                        return true;
+                    }
+                } else if (tjp.getParamsToUseForLimit().contains("||"))  {
+                    // 或的意思，也就是需要关心的参数列表中有任何一个匹配上了就返回true了
+                    if(checkContainsAny(executingUnitParams, itemParams)){
+                        return true;
+                    }
                 }
             }
         }

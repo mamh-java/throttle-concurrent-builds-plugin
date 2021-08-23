@@ -1,5 +1,7 @@
 package hudson.plugins.throttleconcurrents;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import hudson.Extension;
 import hudson.Util;
 import hudson.matrix.MatrixConfiguration;
@@ -237,11 +239,15 @@ public class ThrottleJobProperty extends JobProperty<Job<?,?>> {
     private static List<String> parseParamsToUseForLimit(String paramsToUseForLimit) {
         if (paramsToUseForLimit != null) {
             if (!paramsToUseForLimit.isEmpty()) {
-                String[] split =
-                        ArrayUtils.nullToEmpty(paramsToUseForLimit.split(PARAMS_LIMIT_SEPARATOR));
-                List<String> result = new ArrayList<>(Arrays.asList(split));
-                result.removeAll(Collections.singletonList(""));
-                return result;
+                if(paramsToUseForLimit.contains("&&")) {
+                    ArrayList<String> result = Lists.newArrayList(Splitter.on("&&").trimResults().omitEmptyStrings().split(paramsToUseForLimit));
+                    return result;
+                } else if (paramsToUseForLimit.contains("||")) {
+                    ArrayList<String> result = Lists.newArrayList(Splitter.on("||").trimResults().omitEmptyStrings().split(paramsToUseForLimit));
+                    return result;
+                } else {
+                    return new ArrayList<>();
+                }
             } else {
                 return new ArrayList<>();
             }
