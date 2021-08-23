@@ -34,6 +34,7 @@ import java.util.logging.Logger;
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import jenkins.model.Jenkins;
+import org.apache.commons.collections.CollectionUtils;
 import org.jenkinsci.plugins.workflow.actions.BodyInvocationAction;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionList;
@@ -94,7 +95,6 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
                     if (tjp.getMaxConcurrentPerNode().intValue() > 0) {
                         int maxConcurrentPerNode = tjp.getMaxConcurrentPerNode().intValue();
                         int runCount = buildsOfProjectOnNode(node, task);
-                        LOGGER.info("node: " + node + ", task: " + task + ", max: " + maxConcurrentPerNode + ", run: " + runCount);
                         // This would mean that there are as many or more builds currently running than are allowed.
                         if (runCount >= maxConcurrentPerNode) {
                             return CauseOfBlockage.fromMessage(Messages._ThrottleQueueTaskDispatcher_MaxCapacityOnNode(runCount));
@@ -321,54 +321,47 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
     private boolean isAnotherBuildWithSameParametersRunningOnNode(Node node, Queue.Item item) {
         ThrottleJobProperty tjp = getThrottleJobProperty(item.task);
         if (tjp == null) {
-            // If the property has been occasionally deleted by this call,
-            // it does not make sense to limit the throttling by parameter.
             return false;
         }
         Computer computer = node.toComputer();
+        if (computer == null) {
+            return false;
+        }
+
         List<String> paramsToCompare = tjp.getParamsToCompare();
         List<ParameterValue> itemParams = getParametersFromQueueItem(item);
-
         if (paramsToCompare.size() > 0) {
             itemParams = doFilterParams(paramsToCompare, itemParams);
         }
 
-        // Look at all executors of specified node => computer,
-        // and what work units they are busy with (if any) - and
-        // whether one of these executing units is an instance
-        // of the queued item we were asked to compare to.
-        if (computer != null) {
-            for (Executor exec : computer.getExecutors()) {
-                // TODO: refactor into a nameEquals helper method
-                final Queue.Executable currentExecutable = exec.getCurrentExecutable();
-                final SubTask parentTask = currentExecutable != null ? currentExecutable.getParent() : null;
-                if (currentExecutable != null &&
-                        parentTask.getOwnerTask().getName().equals(item.task.getName())) {
-                    List<ParameterValue> executingUnitParams = getParametersFromWorkUnit(exec.getCurrentWorkUnit());
-                    executingUnitParams = doFilterParams(paramsToCompare, executingUnitParams);
+        for (Executor exec : computer.getExecutors()) {
+            final Queue.Executable currentExecutable = exec.getCurrentExecutable();
+            final SubTask parentTask = currentExecutable != null ? currentExecutable.getParent() : null;
 
-                    // An already executing work unit (of the same name) can have more
-                    // parameters than the queued item, e.g. due to env injection or by
-                    // unfiltered inheritance of "unsupported officially" from a caller.
-                    // Note that similar inheritance can also get more parameters into
-                    // the queued item than is visibly declared in its job configuration.
-                    // Normally the job configuration should declare all params that are
-                    // listed in its throttle configuration. Jenkins may forbid passing
-                    // undeclared parameters anyway, due to security concerns by default.
-                    // We check here whether the interesting (or all, if not filtered)
-                    // specified params of the queued item are same (glorified key=value
-                    // entries) as ones used in a running work unit, in any order.
-                    if (executingUnitParams.containsAll(itemParams)) {
-                        LOGGER.log(Level.FINE, "build (" + exec.getCurrentWorkUnit() +
-                                ") with identical parameters (" +
-                                executingUnitParams + ") is already running.");
-                        return true;
-                    }
+            if (currentExecutable != null &&  parentTask.getOwnerTask().getName().equals(item.task.getName())) {
+                List<ParameterValue> executingUnitParams = getParametersFromWorkUnit(exec.getCurrentWorkUnit());
+                executingUnitParams = doFilterParams(paramsToCompare, executingUnitParams);
+
+                //与的意思，也就是需要关心的参数列表中所有的都要匹配上了才能返回true了
+                if(checkContainsAll(executingUnitParams, itemParams)){
+                    return true;
+                }
+                // 或的意思，也就是需要关心的参数列表中有任何一个匹配上了就返回true了
+                if(checkContainsAny(executingUnitParams, itemParams)){
+                    return true;
                 }
             }
         }
 
         return false;
+    }
+
+    private boolean checkContainsAll(List executingUnitParams, List itemParams){
+        return executingUnitParams.containsAll(itemParams);
+    }
+
+    private boolean checkContainsAny(List executingUnitParams, List itemParams){
+        return CollectionUtils.containsAny(executingUnitParams, itemParams);
     }
 
     /**
