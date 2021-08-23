@@ -92,6 +92,12 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             }
             if (tjp != null) {
                 if (tjp.getThrottleOption().equals("project")) {
+                    if (tjp.isLimitOneJobWithMatchingParams()) {
+                        if (task instanceof PlaceholderTask) {
+                            if (isAnotherBuildWithSameParametersRunningOnAnyNode(task))
+                                return CauseOfBlockage.fromMessage(Messages._ThrottleQueueTaskDispatcher_OnlyOneWithMatchingParameters());
+                        }
+                    }
                     if (tjp.getMaxConcurrentPerNode().intValue() > 0) {
                         int maxConcurrentPerNode = tjp.getMaxConcurrentPerNode().intValue();
                         int runCount = buildsOfProjectOnNode(node, task);
@@ -304,6 +310,20 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         return null;
     }
 
+    private boolean isAnotherBuildWithSameParametersRunningOnAnyNode(Task task) {
+        final Jenkins jenkins = Jenkins.get();
+        if (isAnotherBuildWithSameParametersRunningOnNode(jenkins, task)) {
+            return true;
+        }
+
+        for (Node node : jenkins.getNodes()) {
+            if (isAnotherBuildWithSameParametersRunningOnNode(node, task)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isAnotherBuildWithSameParametersRunningOnAnyNode(Queue.Item item) {
         final Jenkins jenkins = Jenkins.get();
         if (isAnotherBuildWithSameParametersRunningOnNode(jenkins, item)) {
@@ -339,6 +359,47 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
             final SubTask parentTask = currentExecutable != null ? currentExecutable.getParent() : null;
 
             if (currentExecutable != null &&  parentTask.getOwnerTask().getName().equals(item.task.getName())) {
+                List<ParameterValue> executingUnitParams = getParametersFromWorkUnit(exec.getCurrentWorkUnit());
+                executingUnitParams = doFilterParams(paramsToCompare, executingUnitParams);
+
+                if(tjp.getParamsToUseForLimit().contains("&&")) {
+                    //与的意思，也就是需要关心的参数列表中所有的都要匹配上了才能返回true了
+                    if(checkContainsAll(executingUnitParams, itemParams)){
+                        return true;
+                    }
+                } else if (tjp.getParamsToUseForLimit().contains("||"))  {
+                    // 或的意思，也就是需要关心的参数列表中有任何一个匹配上了就返回true了
+                    if(checkContainsAny(executingUnitParams, itemParams)){
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isAnotherBuildWithSameParametersRunningOnNode(Node node, Task task) {
+        ThrottleJobProperty tjp = getThrottleJobProperty(task);
+        if (tjp == null) {
+            return false;
+        }
+        Computer computer = node.toComputer();
+        if (computer == null) {
+            return false;
+        }
+
+        List<String> paramsToCompare = tjp.getParamsToCompare();
+        List<ParameterValue> itemParams = getParametersFromQueueItem(task);
+        if (paramsToCompare.size() > 0) {
+            itemParams = doFilterParams(paramsToCompare, itemParams);
+        }
+
+        for (Executor exec : computer.getExecutors()) {
+            final Queue.Executable currentExecutable = exec.getCurrentExecutable();
+            final SubTask parentTask = currentExecutable != null ? currentExecutable.getParent() : null;
+            // 这里类型是 PlaceholderTask, 普通的freestyle的job 这里也可以这样去判断
+            if (currentExecutable != null &&  parentTask.getOwnerTask().getName().equals(task.getOwnerTask().getName())) {
                 List<ParameterValue> executingUnitParams = getParametersFromWorkUnit(exec.getCurrentWorkUnit());
                 executingUnitParams = doFilterParams(paramsToCompare, executingUnitParams);
 
@@ -423,6 +484,32 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
         else
         {
             paramsList  = new ArrayList<>();
+        }
+        return paramsList;
+    }
+
+    public List<ParameterValue> getParametersFromQueueItem(Task task) {
+        List<ParameterValue> paramsList = new ArrayList<>();
+        try {
+            Field f = task.getClass().getDeclaredField("context");
+            f.setAccessible(true);
+            CpsStepContext context = (CpsStepContext) f.get(task);
+            f = context.getClass().getDeclaredField("executionRef");
+            f.setAccessible(true);
+            FlowExecutionOwner executionRef = (FlowExecutionOwner) f.get(context);
+            f = executionRef.getClass().getDeclaredField("run");
+            f.setAccessible(true);
+            WorkflowRun run = (WorkflowRun) f.get(executionRef);
+            ParametersAction params = run.getAction(ParametersAction.class);
+            if (params != null) {
+                paramsList = params.getParameters();
+            } else {
+                paramsList = new ArrayList<>();
+            }
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
         }
         return paramsList;
     }
