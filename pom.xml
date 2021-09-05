@@ -48,7 +48,7 @@ THE SOFTWARE.
 
   <properties>
     <revision>2.5</revision>
-    <changelist>-SNAPSHOT</changelist>
+    <changelist></changelist>
       <jenkins.version>2.289.3</jenkins.version>
       <java.level>8</java.level>
   </properties>
@@ -78,7 +78,7 @@ THE SOFTWARE.
     <connection>scm:git:git://github.com/mamh-java/throttle-concurrent-builds-plugin.git</connection>
     <developerConnection>scm:git:git@github.com:mamh-java/throttle-concurrent-builds-plugin.git</developerConnection>
     <url>https://github.com/mamh-java/throttle-concurrent-builds-plugin</url>
-    <tag>HEAD</tag>
+    <tag>throttle-concurrents-2.5</tag>
   </scm>
 
 
