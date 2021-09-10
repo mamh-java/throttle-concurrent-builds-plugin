@@ -246,7 +246,8 @@ public class ThrottleJobProperty extends JobProperty<Job<?,?>> {
                     ArrayList<String> result = Lists.newArrayList(Splitter.on("||").trimResults().omitEmptyStrings().split(paramsToUseForLimit));
                     return result;
                 } else {
-                    return new ArrayList<>();
+                    ArrayList<String> result = Lists.newArrayList(Splitter.on(" ").trimResults().omitEmptyStrings().split(paramsToUseForLimit));
+                    return result;
                 }
             } else {
                 return new ArrayList<>();

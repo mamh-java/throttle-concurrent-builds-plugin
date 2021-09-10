@@ -372,6 +372,10 @@ public class ThrottleQueueTaskDispatcher extends QueueTaskDispatcher {
                     if(checkContainsAny(executingUnitParams, itemParams)){
                         return true;
                     }
+                } else {
+                    if(checkContainsAll(executingUnitParams, itemParams) && checkContainsAll(itemParams, executingUnitParams)){
+                        return true;
+                    }
                 }
             }
         }
